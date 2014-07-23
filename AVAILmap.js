@@ -649,11 +649,11 @@
             if (c===undefined && callback) {
                 return callback(self);
             } else if (c===null) {
-                customControl.on('click', null);
+                label.on('click', null);
                 return callback = null;
             }
             callback = c;
-            customControl.on('click', function() {
+            label.on('click', function() {
                 if (d3.event.defaultPrevented) return;
                 d3.event.stopPropagation();
                 callback(self);
@@ -672,17 +672,17 @@
         // this function toggles the custom control on and off. If the optional boolean
         // argument is passed, then the display will be turned on if true and
         // turned off if false.
-        self.toggle = function(t) {
-            if (t) {
-                customControl.style('display', 'block');
+    }
+    _CustomControl.prototype.toggle = function(t) {
+            if (t === true) {
+                this.DOMel.style('display', 'block');
             } else if (t === false) {
-                customControl.style('display', 'none');
+                this.DOMel.style('display', 'none');
             } else {
-                var display = (customControl.style('display') === 'block' ? 'none' : 'block');
-                customControl.style('display', display);
+                var display = (this.DOMel.style('display') === 'block' ? 'none' : 'block');
+                this.DOMel.style('display', display);
             }
         }
-    }
     _CustomControl.prototype = Object.create(_Control.prototype);
     _CustomControl.prototype.constructor = _CustomControl;
 
@@ -763,9 +763,9 @@
     }
 
     // map marker constructor
-    function _MapMarker(coords, options) {
+    function _MapMarker(coords, map, options) {
         var self = this,
-            map,            // D3 selected map to which the marker is appended
+            //map,            // D3 selected map to which the marker is appended
 
             marker,         // map marker DOM element
             baseHeight,     // base marker height
@@ -794,7 +794,7 @@
             click = null;   // optional function to be called when marker is clicked
 
         // this scale is used to resize the marker at different zooms
-        var scale = d3.scale.linear()
+        var _scale = d3.scale.linear()
             .range([.25, 1.0])
             .clamp(true);
 
@@ -806,33 +806,26 @@
             click = options.click || click;
         }
 
-        self.map = function(m) {
-            if (m === undefined) {
-                return map;
-            }
-            map = m;
-            marker = map.append('div')
-                .attr('class', 'avl-marker')
-                .style('background', BGcolor);
+        marker = map.append('div')
+            .attr('class', 'avl-marker')
+            .style('background', BGcolor);
 
-            if (click) {
-                marker.on('click', function() {
-                    if (d3.event.defaultPrevented) return;
-                    d3.event.stopPropagation();
-                    click(self);
-                });
-            }
-
-            if (draggable) {
-                marker.call(d3.behavior.drag()
-                    .on("dragstart", _dragstart)
-                    .on("drag", _drag)
-                    .on("dragend", _dragend));
-            }
-            baseHeight = height = parseInt(marker.style('height'));
-            baseWidth = width = parseInt(marker.style('width'));
-            return self;
+        if (click) {
+            marker.on('click', function() {
+                if (d3.event.defaultPrevented) return;
+                d3.event.stopPropagation();
+                click(self);
+            });
         }
+
+        if (draggable) {
+            marker.call(d3.behavior.drag()
+                .on("dragstart", _dragstart)
+                .on("drag", _drag)
+                .on("dragend", _dragend));
+        }
+        baseHeight = height = parseInt(marker.style('height'));
+        baseWidth = width = parseInt(marker.style('width'));
 
         self.projection = function(p) {
             if (!p) {
@@ -880,9 +873,9 @@
 
         self.scale = function(s) {
             if (!arguments.length) {
-                return scale;
+                return _scale;
             }
-            scale = s;
+            _scale = s;
             return self;
         }
 
@@ -904,7 +897,7 @@
         }
 
         self.update = function(zoom) {
-            var scl = scale(zoom);
+            var scl = _scale(zoom);
 
             height = baseHeight * scl;
             width = baseWidth * scl;
@@ -925,17 +918,17 @@
             return self;
         }
 
-        self.addTo = function(mapObj) {
-            mapObj.addMarker(self);
-            return self;
-        }
+        // self.addTo = function(mapObj) {
+        //     mapObj.addMarker(self);
+        //     return self;
+        // }
 
         self.remove = function() {
             marker.remove();
         }
-        self.removeFrom = function(mapObj) {
-            mapObj.removeMarker(self);
-        }
+        // self.removeFrom = function(mapObj) {
+        //     mapObj.removeMarker(self);
+        // }
 
         function _dragstart() {
             d3.event.sourceEvent.stopPropagation();
@@ -1010,7 +1003,7 @@
             return tile;
         };
 
-          return tile;
+        return tile;
     };
 
     // map constructor function
@@ -1101,8 +1094,8 @@
                     .style("left", function(d) { return d[0] * 256 + "px"; })
                     .style("top", function(d) { return d[1] * 256 + "px"; })
                     .attr('src', rasterLayer.drawTile);
-
             }
+
             if (layersDiv) {
                 var vTiles = layersDiv
                     .style(prefix + "transform", matrix3d(tiles.scale, tiles.translate))
@@ -1245,7 +1238,9 @@
             return layers;
         }
 
-        self.addMarker = function(marker) {
+        self.addMarker = function(coords, options) {
+            var marker = new _MapMarker(coords, map, options);
+
             markers.push(marker);
 
             marker.id('marker-' + (markerIDs++));
@@ -1253,7 +1248,7 @@
             if (marker.name() === null) {
                 marker.name(marker.id());
             }
-            marker.map(map);
+            //marker.map(map);
             marker.projection(projection);
             marker.scale().domain(markerScaleDomain);
             marker.update(currentZoom);
@@ -1261,8 +1256,7 @@
             if (controls !== null) {
             	controls.update('marker', marker);
             }
-
-            return self;
+            return marker;
         }
         self.removeMarker = function(marker) {
             var index = markers.indexOf(marker);
@@ -1279,6 +1273,7 @@
             if (controls !== null) {
                 controls.update('marker', marker);
             }
+            return self;
         }
         self.getMarkers = function() {
         	return markers;
@@ -1315,6 +1310,7 @@
 
     function matrix3d(scale, translate) {
         var k = scale / 256, r = scale % 1 ? Number : Math.round;
+
         return "matrix3d(" + [k, 0, 0, 0,
                               0, k, 0, 0,
                               0, 0, k, 0,
@@ -1325,14 +1321,6 @@
         var i = -1, n = p.length, s = document.body.style;
         while (++i < n) if (p[i] + "Transform" in s) return "-" + p[i].toLowerCase() + "-";
         return "";
-    }
-
-    avl.MapMarker = function(coords, options) {
-        if (typeof coords !== 'undefined') {
-            return new _MapMarker(coords, options);
-        } else {
-            throw new AVAILmapException("You must specify marker coords");
-        }
     }
 
     avl.RasterLayer = function(url, options) {
